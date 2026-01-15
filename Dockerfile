@@ -22,17 +22,20 @@ RUN mvn clean package -DskipTests -B
 FROM eclipse-temurin:21-jre
 
 WORKDIR /app
+
 # Create non-root user for security
-RUN addgroup -S spring && adduser -S spring -G spring
+RUN groupadd -r spring && useradd -r -g spring spring
 USER spring:spring
 
-# Copy JAR from build stage
-COPY --from=build /app/target/*.jar app.jar
+# Copy JAR from build stage with correct permissions
+COPY --from=build --chown=spring:spring /app/target/*.jar app.jar
 
-# Render provides PORT automatically
+# Expose port
 EXPOSE 8080
+
+# Healthcheck using curl (pre-installed in temurin)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+    CMD curl -f http://localhost:8080/actuator/health || exit 1
 
 # Run Spring Boot
 ENTRYPOINT ["java", "-jar", "app.jar"]
